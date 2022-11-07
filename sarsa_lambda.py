@@ -60,6 +60,7 @@ def pi(s, Q, e):
 	''' 
 		acts with argmax(Q), epsilon-soft 
 	'''
+	print("s: ", s)
 	assert(s[0] >= 1 and s[0] <= 10)
 	assert(s[1] >= 1 and s[1] <= 21)
 
@@ -98,6 +99,8 @@ def mc_control():
 		r = 0
 		traj = []
 		is_terminal_state = False
+
+		print("playing episode: ", k)
 		
 		# play one episode
 		while not is_terminal_state:
@@ -112,6 +115,7 @@ def mc_control():
 				break
 
 		# update for each s, a in episode 
+		print("traj: ", traj)
 		for t, sar in enumerate(traj):
 			s, a, r = sar
 
