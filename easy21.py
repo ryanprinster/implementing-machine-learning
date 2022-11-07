@@ -1,86 +1,91 @@
 import random
 from collections import defaultdict
 
-def enumerate_states():
-	return [(dealer, player) for dealer in range(1, 10 + 1) for player in range(1, 21 + 1)]
+class Easy21Env():
+	def __init__(self):
+		pass
 
-def enumerate_actions():
-	return ['hit', 'stick']
+	def enumerate_states(self):
+		return [(dealer, player) for dealer in range(1, 10 + 1) for player in range(1, 21 + 1)]
 
-def draw_card():
-	num = random.randint(1, 10)
-	color = 1 if random.uniform(0, 1) > 1.0/3 else -1
-	return num, color
+	def enumerate_actions(self):
+		return ['hit', 'stick']
 
-def draw_first_cards():
-	#first card is always black
-	dealer_sum, player_sum = random.randint(1, 10), random.randint(1, 10)
-	return dealer_sum, player_sum
+	def _draw_card(self):
+		num = random.randint(1, 10)
+		color = 1 if random.uniform(0, 1) > 1.0/3 else -1
+		return num, color
 
-def dealers_turn(dealer_val):
-	while dealer_val < 17:
-		num, color = draw_card()
-		dealer_val += num*color
-	# can the dealer bust going under 1?
-	return dealer_val
+	def _dealers_turn(self, dealer_val):
+		while dealer_val < 17:
+			num, color = self._draw_card()
+			dealer_val += num*color
+		# can the dealer bust going under 1?
+		return dealer_val
 
-def step(s, a):
+	def init_state(self):
+		#first card is always black
+		dealer_sum, player_sum = random.randint(1, 10), random.randint(1, 10)
+		return dealer_sum, player_sum
 
-	dealer_sum, player_sum = s
-	r = 0
-	is_terminal_state = False
-	if a == 'hit':
-		num, color = draw_card()
-		player_sum += num*color
+	def step(self, s, a):
 
-		if player_sum > 21 or player_sum < 1: 
-			# player busts
-			r = -1
-			is_terminal_state = True
+		dealer_sum, player_sum = s
+		r = 0
+		is_terminal_state = False
+		if a == 'hit':
+			num, color = self._draw_card()
+			player_sum += num*color
 
-	elif a == 'stick':
-		dealer_sum = dealers_turn(dealer_sum)
+			if player_sum > 21 or player_sum < 1: 
+				# player busts
+				r = -1
+				is_terminal_state = True
 
-		if dealer_sum > 21 or player_sum > dealer_sum: 
-			# dealer busts or player beats dealer
-			r = 1
-			is_terminal_state = True
-		elif dealer_sum == player_sum:
-			# dealer and player tie
-			r = 0
-			is_terminal_state = True
-		else: 
-			# dealer beats player
-			r = -1
-			is_terminal_state = True
+		elif a == 'stick':
+			dealer_sum = self._dealers_turn(dealer_sum)
 
-	return (dealer_sum, player_sum), r, is_terminal_state
+			if dealer_sum > 21 or player_sum > dealer_sum: 
+				# dealer busts or player beats dealer
+				r = 1
+				is_terminal_state = True
+			elif dealer_sum == player_sum:
+				# dealer and player tie
+				r = 0
+				is_terminal_state = True
+			else: 
+				# dealer beats player
+				r = -1
+				is_terminal_state = True
 
-def pi(s, Q, e):
-	''' 
-		acts with argmax(Q), epsilon-soft 
-	'''
-	assert(s[0] >= 1 and s[0] <= 10)
-	assert(s[1] >= 1 and s[1] <= 21)
+		return (dealer_sum, player_sum), r, is_terminal_state
 
-	Q.setdefault((s, 'hit'), .5)
-	Q.setdefault((s, 'stick'), .5)
+	def pi(self, s, Q, e):
+		''' 
+			acts with argmax(Q), epsilon-soft 
+		'''
+		assert(s[0] >= 1 and s[0] <= 10)
+		assert(s[1] >= 1 and s[1] <= 21)
 
-	# argmax q
-	a_q = 'hit' if Q[(s, 'hit')] > Q[(s, 'stick')] else 'stick'
+		Q.setdefault((s, 'hit'), .5)
+		Q.setdefault((s, 'stick'), .5)
 
-	#e-soft
-	if random.uniform(0, 1) < e:
-		return 'hit' if random.uniform(0, 1) < .5 else 'stick'
-	else:
-		return a_q
+		# argmax q
+		a_q = 'hit' if Q[(s, 'hit')] > Q[(s, 'stick')] else 'stick'
 
-def mse(Q_pred, Q_true):
-	s_a_pairs = [(s,a) for s in enumerate_states() for a in enumerate_actions()]
-	mse = 0
-	for s_a in s_a_pairs:
-		mse += (Q_true[s_a] - Q_pred[s_a])**2
-	return mse
+		#e-soft
+		if random.uniform(0, 1) < e:
+			return 'hit' if random.uniform(0, 1) < .5 else 'stick'
+		else:
+			return a_q
+
+
+	def mse(self, Q_pred, Q_true):
+		s_a_pairs = [(s,a) for s in self.enumerate_states() for a in self.enumerate_actions()]
+		mse = 0
+		for s_a in s_a_pairs:
+			mse += (Q_true[s_a] - Q_pred[s_a])**2
+		return mse
 
 
 def mc_control():
@@ -91,10 +96,12 @@ def mc_control():
 	epsilon = 1 
 	gamma = .95
 
+	env = Easy21Env()
+
 	# number of episode
 	for k in range(episodes):
 		# init state and rewards
-		s = draw_first_cards()
+		s = env.init_state()
 		r = 0
 		traj = []
 		is_terminal_state = False
@@ -102,8 +109,8 @@ def mc_control():
 		# play one episode
 		while not is_terminal_state:
 			epsilon = N_0 / (N_0 + N[(s, 'hit')] +  N[(s, 'stick')])
-			a = pi(s, Q, epsilon)
-			s_next, r, is_terminal_state = step(s, a)	
+			a = env.pi(s, Q, epsilon)
+			s_next, r, is_terminal_state = env.step(s, a)	
 
 			traj.append((s,a,r))
 			s = s_next
@@ -143,7 +150,7 @@ def sarsa_lambda_control(lambda_=.8, Q_true={}):
 		E = defaultdict(int)
 
 		# init state and rewards
-		s = draw_first_cards()
+		s = init_state()
 		r = 0
 		
 		# Repeat (for each step of episode)
